@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "elm-test": "^0.18.9",
+    "elm-verify-examples": "^1.0.2"
+  }
+}
