@@ -231,12 +231,7 @@ applySign sign number =
 
 applySignToIntOrFloat : Sign -> Either number1 number2 -> Either number1 number2
 applySignToIntOrFloat sign =
-    let
-        applySignToNumber : number -> number
-        applySignToNumber number =
-            applySign sign number
-    in
-    mapBoth applySignToNumber
+    mapBoth (applySign sign)
 
 
 
