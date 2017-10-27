@@ -16,7 +16,7 @@ before_install:
     then
       git clone https://github.com/obmarg/libsysconfcpus.git;
       cd libsysconfcpus;
-      ./configure --prefix=/sysconfcpus;
+      ./configure --prefix=$TRAVIS_BUILD_DIR/sysconfcpus;
       make && make install;
       cd ..;
     fi
@@ -27,7 +27,7 @@ install:
   - cd tests
   - npm install -g elm@$ELM_VERSION
   - mv $(npm config get prefix)/bin/elm-make $(npm config get prefix)/bin/elm-make-old
-  - printf '%s\n\n' '#!/bin/bash' 'echo "Running elm-make with sysconfcpus -n 2"' '/sysconfcpus/bin/sysconfcpus -n 2 elm-make-old "elm-json-parser"' > $(npm config get prefix)/bin/elm-make
+  - printf '%s\n\n' '#!/bin/bash' 'echo "Running elm-make with sysconfcpus -n 2"' '$TRAVIS_BUILD_DIR/sysconfcpus/bin/sysconfcpus -n 2 elm-make-old "elm-json-parser"' > $(npm config get prefix)/bin/elm-make
   - chmod +x $(npm config get prefix)/bin/elm-make
   - npm install
   - elm package install --yes
