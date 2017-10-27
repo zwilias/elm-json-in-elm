@@ -26,9 +26,9 @@ install:
   - npm --version
   - cd tests
   - npm install -g elm@$ELM_VERSION
-  - mv /usr/local/bin/elm-make /usr/local/bin/elm-make-old
-  - printf '%s\n\n' '#!/bin/bash' 'echo "Running elm-make with sysconfcpus -n 2"' '/sysconfcpus/bin/sysconfcpus -n 2 elm-make-old "elm-json-parser"' > /usr/local/bin/elm-make
-  - chmod +x /usr/local/bin/elm-make
+  - mv $(npm config get prefix)/bin/elm-make $(npm config get prefix)/bin/elm-make-old
+  - printf '%s\n\n' '#!/bin/bash' 'echo "Running elm-make with sysconfcpus -n 2"' '/sysconfcpus/bin/sysconfcpus -n 2 elm-make-old "elm-json-parser"' > $(npm config get prefix)/bin/elm-make
+  - chmod +x $(npm config get prefix)/bin/elm-make
   - npm install
   - elm package install --yes
 
