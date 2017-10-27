@@ -206,6 +206,9 @@ float =
                 JsonFloat val ->
                     Ok val
 
+                JsonInt val ->
+                    Ok (toFloat val)
+
                 _ ->
                     Err (Failure "Expected a float" json)
 
@@ -347,3 +350,8 @@ oneOf decoders =
                                     |> OneOf
                                     |> Err
                    )
+
+
+maybe : Decoder a -> Decoder (Maybe a)
+maybe decoder =
+    oneOf [ map Just decoder, succeed Nothing ]
