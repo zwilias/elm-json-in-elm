@@ -37,7 +37,6 @@ ints =
     , """ 1e9 """ => JsonInt <| 1 * 10 ^ 9
     , """ -4e2 """ => JsonInt <| -4 * 10 ^ 2
     , """ 1E2 """ => JsonInt <| 1 * 10 ^ 2
-    , """ 1e-2 """ => JsonInt <| 1 * 10 ^ -2
     , """ 1e+2 """ => JsonInt <| 1 * 10 ^ 2
     ]
         |> successTests "ints"
@@ -60,6 +59,7 @@ floats =
     , """ 0.6e5 """ => JsonFloat 6.0e4
     , """ 0.0e0 """ => JsonFloat 0
     , """ -9.5e6 """ => JsonFloat -9.5e6
+    , """ 1e-1 """ => JsonFloat 0.1
     ]
         |> successTests "floats"
 

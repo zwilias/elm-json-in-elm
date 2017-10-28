@@ -1,9 +1,11 @@
 {
     "dependencies": {
+        "chokidar-cli": "^1.2.0",
         "elm-test": "^0.18.9",
         "elm-verify-examples": "^1.0.2"
     },
     "scripts": {
-        "test": "elm-test"
+        "test": "elm-verify-examples && elm-test",
+        "watch": "chokidar 'src/**/*.elm' 'tests/*Tests.elm' -c 'npm run test'"
     }
 }

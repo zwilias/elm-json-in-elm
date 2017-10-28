@@ -30,3 +30,30 @@ simpleFloat =
             """ 5.0 """
                 |> Decoder.decodeString Decoder.float
                 |> Expect.equal (Ok 5.0)
+
+
+simpleNull : Test
+simpleNull =
+    test "simple null" <|
+        \_ ->
+            """ null """
+                |> Decoder.decodeString (Decoder.null ())
+                |> Expect.equal (Ok ())
+
+
+simpleList : Test
+simpleList =
+    test "simple list" <|
+        \_ ->
+            """ [] """
+                |> Decoder.decodeString (Decoder.list Decoder.string)
+                |> Expect.equal (Ok [])
+
+
+simpleKeyValuePairs : Test
+simpleKeyValuePairs =
+    test "simple key value pairs" <|
+        \_ ->
+            """ {} """
+                |> Decoder.decodeString (Decoder.keyValuePairs Decoder.string)
+                |> Expect.equal (Ok [])

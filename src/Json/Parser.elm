@@ -138,8 +138,8 @@ jsonNumber =
 exponentiateOrFloat : Int -> Parser (Either Int Float)
 exponentiateOrFloat int =
     oneOf
-        [ parseFloat int |> andThen (maybeExponentiate applyExponentToFloat) |> map Right
-        , maybeExponentiate applyExponentToInt int |> map Left
+        [ parseFloat int |> map Right |> andThen maybeExponentiate
+        , succeed int |> map Left |> andThen maybeExponentiate
         ]
 
 
@@ -173,12 +173,25 @@ exponent =
             |= digits
 
 
-maybeExponentiate : (number -> Int -> number) -> number -> Parser number
-maybeExponentiate applyExponent number =
+maybeExponentiate : Either Int Float -> Parser (Either Int Float)
+maybeExponentiate number =
     oneOf
         [ map (applyExponent number) exponent
         , succeed number
         ]
+
+
+applyExponent : Either Int Float -> Int -> Either Int Float
+applyExponent coeff exponent =
+    case coeff of
+        Left int ->
+            if exponent < 0 then
+                Right <| applyExponentToFloat (toFloat int) exponent
+            else
+                Left <| applyExponentToInt int exponent
+
+        Right float ->
+            Right <| applyExponentToFloat float exponent
 
 
 applyExponentToInt : Int -> Int -> Int
