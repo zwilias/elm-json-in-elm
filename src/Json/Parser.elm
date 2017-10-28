@@ -27,7 +27,7 @@ json =
         |= oneOf
             [ map JsonString jsonString
             , map (either JsonInt JsonFloat) jsonNumber
-            , map (\_ -> JsonNull) (keyword "null")
+            , succeed JsonNull |. keyword "null"
             , map JsonArray (lazy <| \_ -> jsonArray)
             , map JsonObject (lazy <| \_ -> jsonObject)
             ]
@@ -49,10 +49,15 @@ jsonString =
 
 stringContent : String -> Parser String
 stringContent acc =
+    let
+        continue : String -> Parser String
+        continue string =
+            stringContent <| acc ++ string
+    in
     oneOf
-        [ escapedControlCharacter |> andThen (\s -> stringContent <| acc ++ s)
-        , escapedUnicode |> andThen (\s -> stringContent <| acc ++ s)
-        , nonControlCharacters |> andThen (\s -> stringContent <| acc ++ s)
+        [ escapedControlCharacter |> andThen continue
+        , escapedUnicode |> andThen continue
+        , nonControlCharacters |> andThen continue
         , succeed acc
         ]
 
@@ -60,12 +65,7 @@ stringContent acc =
 nonControlCharacters : Parser String
 nonControlCharacters =
     keep oneOrMore
-        (not << anyMatch [ (==) '"', (==) '\\', Char.toCode >> isControlChar ])
-
-
-anyMatch : List (a -> Bool) -> a -> Bool
-anyMatch predicates value =
-    List.map ((|>) value) predicates |> List.any identity
+        (noneMatch [ (==) '"', (==) '\\', Char.toCode >> isControlChar ])
 
 
 isControlChar : Char.KeyCode -> Bool
@@ -315,3 +315,13 @@ result onError onSuccess res =
 
         Ok a ->
             onSuccess a
+
+
+noneMatch : List (a -> Bool) -> a -> Bool
+noneMatch predicates value =
+    not <| anyMatch predicates value
+
+
+anyMatch : List (a -> Bool) -> a -> Bool
+anyMatch predicates value =
+    List.map ((|>) value) predicates |> List.any identity

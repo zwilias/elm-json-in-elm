@@ -458,11 +458,67 @@ oneOf decoders =
                    )
 
 
+{-| Dealing with values that maybe result in a type-mismatch.
+
+This particular solution involves completely disregarding errors on the decoder
+and returning succeeding with `Nothing`.
+
+    """ "foo" """
+        |> decodeString (maybe string)
+    --> Ok (Just "foo")
+
+
+    """ "foo" """
+        |> decodeString (maybe int)
+    --> Ok Nothing
+
+
+    """ { "foo": "bar" } """
+        -- Putting the `maybe` inside results in failure, since the field isn't
+        -- there to begin with.
+        |> decodeString (field "bar" (maybe string))
+    --> Err (Failure "Expected an object with a field 'bar'" (Json.JsonObject [ ("foo", Json.JsonString "bar" ) ]))
+
+
+    """ { "foo": "bar" } """
+        -- This actually applies the `maybe` to the entire decoder, meaning the
+        -- missing field error is swallowed entirely.
+        |> decodeString (maybe (field "bar" string))
+    --> Ok Nothing
+
+-}
 maybe : Decoder a -> Decoder (Maybe a)
 maybe decoder =
     oneOf [ map Just decoder, succeed Nothing ]
 
 
+{-| For recursive JSON structures, you'll run into issues defining the recursive
+structure; since you can't have a recursively defined _value_.
+
+`lazy` handles that by enforcing `lazy` evaluation: the decoder isn't executed
+until it actually has to.
+
+    input : String
+    input =
+        """
+    { "value": 12, "next": { "value" : 7, "next": null } }
+    """
+
+
+    inputDecoder : Decoder (List Int)
+    inputDecoder =
+        oneOf
+            [ null []
+            , map2 (::)
+                (field "value" int)
+                (field "next" (lazy <| \_ -> inputDecoder))
+            ]
+
+
+    input |> decodeString inputDecoder
+    --> Ok [ 12, 7 ]
+
+-}
 lazy : (() -> Decoder a) -> Decoder a
 lazy decoder =
     Decoder <|
@@ -474,6 +530,44 @@ lazy decoder =
 -- Combining decoders
 
 
+{-| Transform the result of a decoder by executing a function on it.
+
+    """ 66 """
+        |> decodeString (map (\x -> x // 2) int)
+    --> Ok 33
+
+-}
+map : (a -> b) -> Decoder a -> Decoder b
+map f (Decoder decoderF) =
+    Decoder (decoderF >> Result.map f)
+
+
+{-| Combine the results of 2 decoders by executing a function on it.
+
+    """ { "left": 66, "right": "foo" } """
+        |> decodeString
+            (
+                map2 (\left right -> { left = left, right = right })
+                    (field "left" int)
+                    (field "right" string)
+            )
+    --> Ok { left = 66, right = "foo" }
+
+-}
+map2 : (a -> b -> c) -> Decoder a -> Decoder b -> Decoder c
+map2 f (Decoder decoderFA) (Decoder decoderFB) =
+    Decoder <|
+        \val ->
+            Result.map2 f (decoderFA val) (decoderFB val)
+
+
+{-| Chain decoders that depend on the value of some other decoder.
+
+    """ { "key": "foo", "foo": "bar" } """
+        |> decodeString (field "key" string |> andThen (\key -> field key string))
+    --> Ok "bar"
+
+-}
 andThen : (a -> Decoder b) -> Decoder a -> Decoder b
 andThen toB (Decoder decoderF) =
     Decoder <|
@@ -486,23 +580,23 @@ andThen toB (Decoder decoderF) =
                     Err err
 
 
-map : (a -> b) -> Decoder a -> Decoder b
-map f (Decoder decoderF) =
-    Decoder (decoderF >> Result.map f)
+{-| Apply a value to a function that's _in_ a decoder.
 
+    """ { "first": "a", "rest": [ "b", "c", "d" ] } """
+        |> decodeString (
+            map (::) (field "first" string)
+                |> andMap (field "rest" (list string))
+        )
+    --> Ok [ "a", "b", "c", "d" ]
 
-map2 : (a -> b -> c) -> Decoder a -> Decoder b -> Decoder c
-map2 f (Decoder decoderFA) (Decoder decoderFB) =
-    Decoder <|
-        \val ->
-            Result.map2 f (decoderFA val) (decoderFB val)
-
-
+-}
 andMap : Decoder a -> Decoder (a -> b) -> Decoder b
 andMap =
     map2 (|>)
 
 
+{-| Combine the results of 3 decoders into a single thing.
+-}
 map3 :
     (a -> b -> c -> d)
     -> Decoder a
@@ -515,6 +609,8 @@ map3 f decA decB decC =
         |> andMap decC
 
 
+{-| Combine the results of 4 decoders into a single thing.
+-}
 map4 :
     (a -> b -> c -> d -> e)
     -> Decoder a
@@ -529,6 +625,8 @@ map4 f decA decB decC decD =
         |> andMap decD
 
 
+{-| Combine the results of 5 decoders into a single thing.
+-}
 map5 :
     (a -> b -> c -> d -> e -> f)
     -> Decoder a
@@ -545,6 +643,8 @@ map5 f decA decB decC decD decE =
         |> andMap decE
 
 
+{-| Combine the results of 6 decoders into a single thing.
+-}
 map6 :
     (a -> b -> c -> d -> e -> f -> g)
     -> Decoder a
@@ -563,6 +663,8 @@ map6 f decA decB decC decD decE decF =
         |> andMap decF
 
 
+{-| Combine the results of 7 decoders into a single thing.
+-}
 map7 :
     (a -> b -> c -> d -> e -> f -> g -> h)
     -> Decoder a
@@ -583,6 +685,8 @@ map7 f decA decB decC decD decE decF decG =
         |> andMap decG
 
 
+{-| Combine the results of 8 decoders into a single thing.
+-}
 map8 :
     (a -> b -> c -> d -> e -> f -> g -> h -> i)
     -> Decoder a
