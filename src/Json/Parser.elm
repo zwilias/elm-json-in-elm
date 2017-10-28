@@ -2,8 +2,28 @@ module Json.Parser exposing (Error, parse)
 
 import Char
 import Json exposing (Value)
-import Parser exposing (..)
-import Parser.LanguageKit exposing (..)
+import Parser
+    exposing
+        ( (|.)
+        , (|=)
+        , Count(Exactly)
+        , Parser
+        , andThen
+        , end
+        , fail
+        , ignore
+        , inContext
+        , keep
+        , keyword
+        , lazy
+        , map
+        , oneOf
+        , oneOrMore
+        , succeed
+        , symbol
+        , zeroOrMore
+        )
+import Parser.LanguageKit exposing (Trailing(Forbidden), list, sequence)
 
 
 type alias Error =
@@ -12,7 +32,7 @@ type alias Error =
 
 parse : String -> Result Error Value
 parse =
-    run (json |. end)
+    Parser.run (json |. end)
 
 
 spaces : Parser ()

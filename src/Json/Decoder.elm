@@ -1,6 +1,37 @@
-module Json.Decoder exposing (..)
+module Json.Decoder
+    exposing
+        ( Decoder
+        , Error(..)
+        , andMap
+        , andThen
+        , at
+        , decodeString
+        , decodeValue
+        , fail
+        , field
+        , float
+        , index
+        , int
+        , keyValuePairs
+        , lazy
+        , list
+        , map
+        , map2
+        , map3
+        , map4
+        , map5
+        , map6
+        , map7
+        , map8
+        , maybe
+        , null
+        , oneOf
+        , string
+        , succeed
+        , value
+        )
 
-import Json exposing (Value(..))
+import Json exposing (Value)
 import Json.Parser exposing (parse)
 
 
@@ -423,34 +454,32 @@ from all of them. Else, you'll receive the value of the first successful decoder
 -}
 oneOf : List (Decoder a) -> Decoder a
 oneOf decoders =
+    let
+        combineResults : Value -> Decoder a -> ( List Error, Maybe a ) -> ( List Error, Maybe a )
+        combineResults json (Decoder decoderF) ( errors, result ) =
+            case result of
+                Just _ ->
+                    ( errors, result )
+
+                Nothing ->
+                    case decoderF json of
+                        Ok val ->
+                            ( errors, Just val )
+
+                        Err e ->
+                            ( e :: errors, Nothing )
+
+        wrapUp : ( List Error, Maybe a ) -> Result Error a
+        wrapUp ( errors, result ) =
+            Maybe.map Ok result
+                |> Maybe.withDefault (Err <| OneOf <| List.reverse errors)
+    in
     Decoder <|
         \json ->
-            List.foldl
-                (\(Decoder decoderF) ( errors, result ) ->
-                    case result of
-                        Just val ->
-                            ( errors, result )
-
-                        Nothing ->
-                            case decoderF json of
-                                Ok val ->
-                                    ( errors, Just val )
-
-                                Err e ->
-                                    ( e :: errors, Nothing )
-                )
+            List.foldl (combineResults json)
                 ( [], Nothing )
                 decoders
-                |> (\( errors, result ) ->
-                        case result of
-                            Just val ->
-                                Ok val
-
-                            _ ->
-                                List.reverse errors
-                                    |> OneOf
-                                    |> Err
-                   )
+                |> wrapUp
 
 
 {-| Dealing with values that maybe result in a type-mismatch.
