@@ -379,6 +379,11 @@ list (Decoder decoderF) =
         |> decodeString (index 1 int)
     --> Ok 12
 
+
+    """ [] """
+        |> decodeString (index 0 int)
+    --> Err (Failure "Expected an array with index 0" (Json.JsonArray []))
+
 -}
 index : Int -> Decoder a -> Decoder a
 index idx (Decoder decoderF) =
@@ -405,6 +410,22 @@ index idx (Decoder decoderF) =
 -- Complicated structures
 
 
+{-| Try a bunch of decoders. If all fail, you'll get an error with information
+from all of them. Else, you'll receive the value of the first successful decoder.
+
+    stringOrIntString : Decoder String
+    stringOrIntString =
+        oneOf
+            [ map toString int
+            , string
+            ]
+
+
+    """ [ "foo", 12 ] """
+        |> decodeString (list stringOrIntString)
+    --> Ok [ "foo", "12" ]
+
+-}
 oneOf : List (Decoder a) -> Decoder a
 oneOf decoders =
     Decoder <|
@@ -440,6 +461,13 @@ oneOf decoders =
 maybe : Decoder a -> Decoder (Maybe a)
 maybe decoder =
     oneOf [ map Just decoder, succeed Nothing ]
+
+
+lazy : (() -> Decoder a) -> Decoder a
+lazy decoder =
+    Decoder <|
+        \json ->
+            decodeValue (decoder ()) json
 
 
 
