@@ -36,6 +36,12 @@ json =
 
 
 -- Dealing with strings
+{- A JSON string is a sequence of characters enclosed by double quotes. Within
+   those quotes, a specific bunch of characters is allowed and has special
+   meaning.
+
+   Importantly, control characters are not allowed unless escaped.
+-}
 
 
 jsonString : Parser String
@@ -47,68 +53,79 @@ jsonString =
             |. symbol "\""
 
 
+
+{- We build up the contents of the string piece by piece. Once we run out of
+   acceptable characters, the next character must be a double quote. If it is
+   not, the JSON isn't valid.
+-}
+
+
 stringContent : String -> Parser String
 stringContent acc =
     let
+        {- This little trick allows us to piece the parts together.
+           Strictly speaking, it requires a few extra allocations that aren't
+           absolutely necessary, but clarity, simplicity and correctness are
+           chosen over pure performance in this implementation.
+        -}
         continue : String -> Parser String
         continue string =
             stringContent <| acc ++ string
     in
     oneOf
-        [ escapedControlCharacter |> andThen continue
+        [ {- First things first, escaped control characters.
+             This means that characters like `\n` must be escaped as `\\n`
+             So a literal backslash followed by a literal `n`.
+          -}
+          escapedControlCharacter |> andThen continue
+
+        {- Arbitrary unicode can be embedded using `\uXXXX` where the `X`s form
+           a valid hexadecimal sequence.
+        -}
         , escapedUnicode |> andThen continue
+
+        {- Finally, we have the rest of unicode, specifically disallowing certain
+           things: control characters, literal `\` and literal `"`.
+        -}
         , nonControlCharacters |> andThen continue
+
+        {- If none of the above produce anything, we succeed with what we've
+           accumulated so far.
+        -}
         , succeed acc
         ]
 
 
-nonControlCharacters : Parser String
-nonControlCharacters =
-    keep oneOrMore
-        (noneMatch [ (==) '"', (==) '\\', Char.toCode >> isControlChar ])
-
-
-isControlChar : Char.KeyCode -> Bool
-isControlChar keyCode =
-    (keyCode < 0x20) || (keyCode == 0x7F)
-
-
 escapedControlCharacter : Parser String
 escapedControlCharacter =
+    {- According to [RFC](), these character must be escaped using a literal
+       backslash, except `/` which _may_ be escaped.
+
+       [RFC]: https://tools.ietf.org/html/rfc7159#section-7
+    -}
     [ ( "\\\"", "\"" )
     , ( "\\\\", "\\" )
+    , ( "\\/", "/" )
     , ( "\\b", "\x08" )
-    , ( "\\r", "\x0D" )
-    , ( "\\n", "\n" )
     , ( "\\f", "\x0C" )
+    , ( "\\n", "\n" )
+    , ( "\\r", "\x0D" )
     , ( "\\t", "\t" )
     ]
-        |> List.map (uncurry symbolicString)
+        |> List.map symbolicString
         |> oneOf
 
 
-symbolicString : String -> String -> Parser String
-symbolicString expected replacement =
+symbolicString : ( String, String ) -> Parser String
+symbolicString ( expected, replacement ) =
     succeed replacement |. symbol expected
 
 
 escapedUnicode : Parser String
 escapedUnicode =
-    succeed identity
+    succeed (Char.fromCode >> String.fromChar)
         |. symbol "\\u"
-        |= possiblyWrapped
-            { begin = "{"
-            , end = "}"
-            , content = hexQuad |> map (Char.fromCode >> String.fromChar)
-            }
-
-
-possiblyWrapped : { begin : String, end : String, content : Parser a } -> Parser a
-possiblyWrapped { begin, end, content } =
-    oneOf
-        [ succeed identity |. symbol begin |= content |. symbol end
-        , content
-        ]
+        |= hexQuad
 
 
 hexQuad : Parser Int
@@ -119,8 +136,23 @@ hexQuad =
 hexQuadToInt : String -> Parser Int
 hexQuadToInt quad =
     ("0x" ++ quad)
+        -- Kind of cheating here.
         |> String.toInt
         |> result fail succeed
+
+
+nonControlCharacters : Parser String
+nonControlCharacters =
+    {- So basically, anything other than control characters, literal backslashes
+       (which are already handled, unless it's invalid json), and the closing `"`
+    -}
+    keep oneOrMore
+        (noneMatch [ (==) '"', (==) '\\', Char.toCode >> isControlChar ])
+
+
+isControlChar : Char.KeyCode -> Bool
+isControlChar keyCode =
+    (keyCode < 0x20) || (keyCode == 0x7F)
 
 
 
@@ -129,10 +161,37 @@ hexQuadToInt quad =
 
 jsonNumber : Parser (Either Int Float)
 jsonNumber =
+    {- This involves quite a few brittle things:
+
+        - decode the sign (so possibly a unary minus)
+        - decodes digits, then checks if its scientific notation or a float
+        - and finally, it applies the sign.
+
+       The sign has to be applied at the end, or we risk messing up float-stuff.
+    -}
     inContext "a json number" <|
         succeed applySignToIntOrFloat
             |= maybeNegative
             |= (digits |> andThen exponentiateOrFloat)
+
+
+digits : Parser Int
+digits =
+    keep oneOrMore Char.isDigit
+        |> andThen (String.toInt >> result fail succeed)
+
+
+applySignToIntOrFloat : Sign -> Either number1 number2 -> Either number1 number2
+applySignToIntOrFloat sign =
+    mapBoth (applySign sign)
+
+
+maybeNegative : Parser Sign
+maybeNegative =
+    oneOf
+        [ symbol "-" |> map (always Negative)
+        , succeed Positive
+        ]
 
 
 exponentiateOrFloat : Int -> Parser (Either Int Float)
@@ -164,6 +223,14 @@ toFractional float =
         float
 
 
+maybeExponentiate : Either Int Float -> Parser (Either Int Float)
+maybeExponentiate number =
+    oneOf
+        [ exponent |> map (applyExponent number)
+        , succeed number
+        ]
+
+
 exponent : Parser Int
 exponent =
     inContext "exponent" <|
@@ -173,16 +240,22 @@ exponent =
             |= digits
 
 
-maybeExponentiate : Either Int Float -> Parser (Either Int Float)
-maybeExponentiate number =
-    oneOf
-        [ map (applyExponent number) exponent
-        , succeed number
-        ]
-
-
 applyExponent : Either Int Float -> Int -> Either Int Float
 applyExponent coeff exponent =
+    {- I'm not particularly proud of this bit.
+
+       The core issue is that exponentiation in Elm isn't very type-safe.
+
+           (^) : number -> number -> number
+
+       In other words, according to the type signature, `n ^ m`  is an integer when
+       both `n` and `m` are integers. However, negative exponents sort of mess this
+       up: `10 ^ -1 = 0.1`. However, if both parameters are integers, Elm will
+       actually say `0.1` is an integer.
+
+       Hence, when the coefficient is an integer and the exponent is negative, we
+       return a `Float` here.
+    -}
     case coeff of
         Left int ->
             if exponent < 0 then
@@ -204,18 +277,9 @@ applyExponentToFloat coeff exponent =
     coeff * (10 ^ toFloat exponent)
 
 
-digits : Parser Int
-digits =
-    keep oneOrMore Char.isDigit
-        |> andThen (String.toInt >> result fail succeed)
-
-
-maybeNegative : Parser Sign
-maybeNegative =
-    oneOf
-        [ symbol "-" |> map (always Negative)
-        , succeed Positive
-        ]
+type Sign
+    = Positive
+    | Negative
 
 
 sign : Parser Sign
@@ -225,11 +289,6 @@ sign =
         , symbol "+" |> map (always Positive)
         , succeed Positive
         ]
-
-
-type Sign
-    = Positive
-    | Negative
 
 
 applySign : Sign -> number -> number
@@ -242,11 +301,6 @@ applySign sign number =
             -number
 
 
-applySignToIntOrFloat : Sign -> Either number1 number2 -> Either number1 number2
-applySignToIntOrFloat sign =
-    mapBoth (applySign sign)
-
-
 
 -- Dealing with arrays
 
@@ -254,6 +308,10 @@ applySignToIntOrFloat sign =
 jsonArray : Parser (List Value)
 jsonArray =
     list spaces (lazy <| \_ -> json)
+
+
+
+-- Dealing with objects
 
 
 jsonObject : Parser (List ( String, Value ))

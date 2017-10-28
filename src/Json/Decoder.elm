@@ -138,11 +138,6 @@ value =
     --> Ok "foo\nbar\nbar"
 
 
-    """ "foo\\u{0020}bar" """
-        |> decodeString string
-    --> Ok "foo bar"
-
-
     """ "foo\\u0020bar" """
         |> decodeString string
     --> Ok "foo bar"

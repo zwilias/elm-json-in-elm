@@ -13,7 +13,7 @@ strings =
     , """ "a\\"" """ => Json.String "a\""
     , """ "\\\\b" """ => Json.String "\\b"
     , """ "This \\" is a \\n complicated \\t string" """ => Json.String "This \" is a \n complicated \t string"
-    , """ "unicode\\u{0020}spaces" """ => Json.String "unicode spaces"
+    , """ "unicode\\u0020spaces" """ => Json.String "unicode spaces"
     ]
         |> successTests "strings"
 
