@@ -5,49 +5,49 @@ import Json.Encode as Core
 
 
 type Value
-    = JsonString String
-    | JsonInt Int
-    | JsonFloat Float
-    | JsonNull
-    | JsonArray (List Value)
-    | JsonObject (List ( String, Value ))
+    = String String
+    | Int Int
+    | Float Float
+    | Null
+    | Array (List Value)
+    | Object (List ( String, Value ))
 
 
 toCore : Value -> Core.Value
 toCore value =
     case value of
-        JsonString val ->
+        String val ->
             Core.string val
 
-        JsonInt val ->
+        Int val ->
             Core.int val
 
-        JsonFloat val ->
+        Float val ->
             Core.float val
 
-        JsonNull ->
+        Null ->
             Core.null
 
-        JsonArray values ->
+        Array values ->
             List.map toCore values |> Core.list
 
-        JsonObject kvPairs ->
+        Object kvPairs ->
             List.map (Tuple.mapSecond toCore) kvPairs |> Core.object
 
 
 fromCore : Core.Value -> Value
 fromCore value =
     CoreDecode.decodeValue decoder value
-        |> Result.withDefault JsonNull
+        |> Result.withDefault Null
 
 
 decoder : CoreDecode.Decoder Value
 decoder =
     CoreDecode.oneOf
-        [ CoreDecode.map JsonString CoreDecode.string
-        , CoreDecode.map JsonInt CoreDecode.int
-        , CoreDecode.map JsonFloat CoreDecode.float
-        , CoreDecode.null JsonNull
-        , CoreDecode.map JsonArray (CoreDecode.list <| CoreDecode.lazy <| \_ -> decoder)
-        , CoreDecode.map JsonObject (CoreDecode.keyValuePairs <| CoreDecode.lazy <| \_ -> decoder)
+        [ CoreDecode.map String CoreDecode.string
+        , CoreDecode.map Int CoreDecode.int
+        , CoreDecode.map Float CoreDecode.float
+        , CoreDecode.null Null
+        , CoreDecode.map Array (CoreDecode.list <| CoreDecode.lazy <| \_ -> decoder)
+        , CoreDecode.map Object (CoreDecode.keyValuePairs <| CoreDecode.lazy <| \_ -> decoder)
         ]

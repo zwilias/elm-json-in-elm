@@ -1,7 +1,7 @@
 module Json.Parser exposing (Error, parse)
 
 import Char
-import Json exposing (Value(..))
+import Json exposing (Value)
 import Parser exposing (..)
 import Parser.LanguageKit exposing (..)
 
@@ -25,11 +25,11 @@ json =
     succeed identity
         |. spaces
         |= oneOf
-            [ map JsonString jsonString
-            , map (either JsonInt JsonFloat) jsonNumber
-            , succeed JsonNull |. keyword "null"
-            , map JsonArray (lazy <| \_ -> jsonArray)
-            , map JsonObject (lazy <| \_ -> jsonObject)
+            [ map Json.String jsonString
+            , map (either Json.Int Json.Float) jsonNumber
+            , succeed Json.Null |. keyword "null"
+            , map Json.Array (lazy <| \_ -> jsonArray)
+            , map Json.Object (lazy <| \_ -> jsonObject)
             ]
         |. spaces
 

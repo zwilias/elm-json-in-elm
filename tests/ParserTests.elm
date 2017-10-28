@@ -1,19 +1,19 @@
 module ParserTests exposing (..)
 
 import Expect exposing (Expectation)
-import Json exposing (Value(..))
+import Json exposing (Value)
 import Json.Parser as Parser
 import Test exposing (..)
 
 
 strings : Test
 strings =
-    [ """ "" """ => JsonString ""
-    , """ "foo" """ => JsonString "foo"
-    , """ "a\\"" """ => JsonString "a\""
-    , """ "\\\\b" """ => JsonString "\\b"
-    , """ "This \\" is a \\n complicated \\t string" """ => JsonString "This \" is a \n complicated \t string"
-    , """ "unicode\\u{0020}spaces" """ => JsonString "unicode spaces"
+    [ """ "" """ => Json.String ""
+    , """ "foo" """ => Json.String "foo"
+    , """ "a\\"" """ => Json.String "a\""
+    , """ "\\\\b" """ => Json.String "\\b"
+    , """ "This \\" is a \\n complicated \\t string" """ => Json.String "This \" is a \n complicated \t string"
+    , """ "unicode\\u{0020}spaces" """ => Json.String "unicode spaces"
     ]
         |> successTests "strings"
 
@@ -30,14 +30,14 @@ failStrings =
 
 ints : Test
 ints =
-    [ """ 5 """ => JsonInt 5
-    , """ -0 """ => JsonInt 0
-    , """ 0 """ => JsonInt 0
-    , """ -9099 """ => JsonInt -9099
-    , """ 1e9 """ => JsonInt <| 1 * 10 ^ 9
-    , """ -4e2 """ => JsonInt <| -4 * 10 ^ 2
-    , """ 1E2 """ => JsonInt <| 1 * 10 ^ 2
-    , """ 1e+2 """ => JsonInt <| 1 * 10 ^ 2
+    [ """ 5 """ => Json.Int 5
+    , """ -0 """ => Json.Int 0
+    , """ 0 """ => Json.Int 0
+    , """ -9099 """ => Json.Int -9099
+    , """ 1e9 """ => Json.Int <| 1 * 10 ^ 9
+    , """ -4e2 """ => Json.Int <| -4 * 10 ^ 2
+    , """ 1E2 """ => Json.Int <| 1 * 10 ^ 2
+    , """ 1e+2 """ => Json.Int <| 1 * 10 ^ 2
     ]
         |> successTests "ints"
 
@@ -54,26 +54,26 @@ badInts =
 
 floats : Test
 floats =
-    [ """ 0.5 """ => JsonFloat 0.5
-    , """ -0.0 """ => JsonFloat 0
-    , """ 0.6e5 """ => JsonFloat 6.0e4
-    , """ 0.0e0 """ => JsonFloat 0
-    , """ -9.5e6 """ => JsonFloat -9.5e6
-    , """ 1e-1 """ => JsonFloat 0.1
+    [ """ 0.5 """ => Json.Float 0.5
+    , """ -0.0 """ => Json.Float 0
+    , """ 0.6e5 """ => Json.Float 6.0e4
+    , """ 0.0e0 """ => Json.Float 0
+    , """ -9.5e6 """ => Json.Float -9.5e6
+    , """ 1e-1 """ => Json.Float 0.1
     ]
         |> successTests "floats"
 
 
 arrays : Test
 arrays =
-    [ """ [] """ => JsonArray []
-    , """ [ "foo" ] """ => JsonArray [ JsonString "foo" ]
-    , """ [null] """ => JsonArray [ JsonNull ]
+    [ """ [] """ => Json.Array []
+    , """ [ "foo" ] """ => Json.Array [ Json.String "foo" ]
+    , """ [null] """ => Json.Array [ Json.Null ]
     , """ [
 null
-\t,         "foo"] """ => JsonArray [ JsonNull, JsonString "foo" ]
-    , """ [ 5, 6.0, 1.0e9, -12 ] """ => JsonArray [ JsonInt 5, JsonFloat 6, JsonFloat 1.0e9, JsonInt -12 ]
-    , "[[]]" => JsonArray [ JsonArray [] ]
+\t,         "foo"] """ => Json.Array [ Json.Null, Json.String "foo" ]
+    , """ [ 5, 6.0, 1.0e9, -12 ] """ => Json.Array [ Json.Int 5, Json.Float 6, Json.Float 1.0e9, Json.Int -12 ]
+    , "[[]]" => Json.Array [ Json.Array [] ]
     ]
         |> successTests "arrays"
 
@@ -91,8 +91,8 @@ badArrays =
 
 objects : Test
 objects =
-    [ """ {} """ => JsonObject []
-    , """ { "hello": "world" } """ => JsonObject [ "hello" => JsonString "world" ]
+    [ """ {} """ => Json.Object []
+    , """ { "hello": "world" } """ => Json.Object [ "hello" => Json.String "world" ]
     ]
         |> successTests "objects"
 
@@ -105,7 +105,7 @@ badObjects =
 
 null : Test
 null =
-    successTest "null" JsonNull
+    successTest "null" Json.Null
 
 
 arbitrary : Test
@@ -130,16 +130,16 @@ arbitrary =
 
         expected : Value
         expected =
-            JsonArray
-                [ JsonNull
-                , JsonString "foo"
-                , JsonFloat 1.23
-                , JsonInt 99
-                , JsonObject
-                    [ "type" => JsonString "foo"
-                    , "bar" => JsonString "baz"
-                    , "age" => JsonInt 27
-                    , "stuff" => JsonArray [ JsonInt 1, JsonInt 2, JsonInt 3 ]
+            Json.Array
+                [ Json.Null
+                , Json.String "foo"
+                , Json.Float 1.23
+                , Json.Int 99
+                , Json.Object
+                    [ "type" => Json.String "foo"
+                    , "bar" => Json.String "baz"
+                    , "age" => Json.Int 27
+                    , "stuff" => Json.Array [ Json.Int 1, Json.Int 2, Json.Int 3 ]
                     ]
                 ]
     in
