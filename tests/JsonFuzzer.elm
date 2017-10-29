@@ -5,8 +5,8 @@ import Char
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer)
 import Json
-import Json.Decode as Decode
 import Json.Encode as Encode exposing (encode)
+import Json.Encoder as Encoder
 
 
 jsonString : Int -> Fuzzer String
@@ -18,19 +18,7 @@ json : Int -> Fuzzer ( Json.Value, String )
 json =
     rawJson
         >> Fuzz.map
-            (\value ->
-                let
-                    asString =
-                        value |> Json.toCore |> Encode.encode 0
-
-                    fromString =
-                        asString
-                            |> Decode.decodeString Decode.value
-                            |> Result.map Json.fromCore
-                            |> Result.withDefault Json.Null
-                in
-                ( fromString, asString )
-            )
+            (\value -> ( value, value |> Json.toCore |> Encode.encode 0 ))
 
 
 rawJson : Int -> Fuzzer Json.Value
@@ -43,17 +31,17 @@ rawJson maxDepth =
 
 leaves : List ( Float, Fuzzer Json.Value )
 leaves =
-    [ 1 => Fuzz.constant Json.Null
-    , 3 => Fuzz.map Json.String hardcoreString
-    , 3 => Fuzz.map Json.Int Fuzz.int
-    , 3 => Fuzz.map Json.Float Fuzz.float
+    [ 1 => Fuzz.constant Encoder.null
+    , 3 => Fuzz.map Encoder.string hardcoreString
+    , 3 => Fuzz.map Encoder.int Fuzz.int
+    , 3 => Fuzz.map Encoder.float Fuzz.float
     ]
 
 
 branches : Int -> List ( Float, Fuzzer Json.Value )
 branches maxDepth =
-    [ 1 => Fuzz.map Json.Array (Fuzz.list (rawJson maxDepth))
-    , 1 => Fuzz.map Json.Object (Fuzz.list (objectEntry maxDepth))
+    [ 1 => Fuzz.map Encoder.list (Fuzz.list (rawJson maxDepth))
+    , 1 => Fuzz.map Encoder.object (Fuzz.list (objectEntry maxDepth))
     ]
 
 
