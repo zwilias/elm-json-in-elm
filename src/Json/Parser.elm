@@ -143,6 +143,12 @@ symbolicString ( expected, replacement ) =
 
 escapedUnicode : Parser String
 escapedUnicode =
+    {- JavaScript (and soon, Elm) allow arbitrary UTF-16 codepoints to be
+       written using `\uBEEF` syntax. These may also appear in escaped version
+       in JSON, so a literal `\u` followed by 4 hexadecimal characters.
+
+       This means something like a space may also be written as `\\u0020`
+    -}
     succeed (Char.fromCode >> String.fromChar)
         |. symbol "\\u"
         |= hexQuad
@@ -242,6 +248,11 @@ makeFloat integerPart fracPart =
 
 toFractional : String -> Float
 toFractional floatString =
+    {- We parse "0.1" in 2 parts - an integer `0` and a _String_ `1`. The reason
+       for parsing the fractional as a String is because we need to handle cases
+       like `1.01`. So, to turn the string `"01"` into `0.01`, we turn it into
+       an integer and move if right by dividing by 10 a couple of times.
+    -}
     floatString
         |> String.toInt
         |> Result.withDefault 0
@@ -255,6 +266,17 @@ dividedBy divisor dividend =
 
 maybeExponentiate : Either Int Float -> Parser (Either Int Float)
 maybeExponentiate number =
+    {- At this point, we're dealing with either an Int or a Float, and may
+       encounter an exponent (in the scientific notation sense).
+
+       For example, `0.01e2` means we'll have a `Right 0.01` value here, and
+       want to multiply it by `10 ^ 2`.
+
+       Writing this down makes me realize that `0.01e2` could conceivably be
+       considered an Int; and I may need to revise my strategy. Especially since
+       we already make sure to parse `4e-1` as a Float (since having a `0.4` as
+       an Int seems _really_ wrong).
+    -}
     oneOf
         [ exponent |> map (applyExponent number)
         , succeed number
@@ -278,13 +300,16 @@ applyExponent coeff exponent =
 
            (^) : number -> number -> number
 
-       In other words, according to the type signature, `n ^ m`  is an integer when
-       both `n` and `m` are integers. However, negative exponents sort of mess this
-       up: `10 ^ -1 = 0.1`. However, if both parameters are integers, Elm will
-       actually say `0.1` is an integer.
+       In other words, according to the type signature, `n ^ m`  is an integer
+       when both `n` and `m` are integers. However, negative exponents sort of
+       mess this up: `10 ^ -1 = 0.1`. However, if both parameters are integers,
+       Elm will actually say `0.1` is an integer.
 
-       Hence, when the coefficient is an integer and the exponent is negative, we
-       return a `Float` here.
+       Hence, when the coefficient is an integer and the exponent is negative,
+       we return a `Float` here.
+
+       So; new idea: consider everything a Float and "cast" it to an Int if
+       possible as late as possible.
     -}
     case coeff of
         Left int ->
