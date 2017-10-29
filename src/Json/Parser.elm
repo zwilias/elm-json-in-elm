@@ -195,9 +195,14 @@ jsonNumber =
             |= (digits |> andThen exponentiateOrFloat)
 
 
+digitString : Parser String
+digitString =
+    keep oneOrMore Char.isDigit
+
+
 digits : Parser Int
 digits =
-    keep oneOrMore Char.isDigit
+    digitString
         |> andThen (String.toInt >> result fail succeed)
 
 
@@ -227,20 +232,25 @@ parseFloat intPart =
     inContext "float" <|
         succeed (makeFloat intPart)
             |. symbol "."
-            |= digits
+            |= digitString
 
 
-makeFloat : Int -> Int -> Float
+makeFloat : Int -> String -> Float
 makeFloat integerPart fracPart =
-    toFloat integerPart + toFractional (toFloat fracPart)
+    toFloat integerPart + toFractional fracPart
 
 
-toFractional : Float -> Float
-toFractional float =
-    if float > 1 then
-        toFractional (float / 10)
-    else
-        float
+toFractional : String -> Float
+toFractional floatString =
+    floatString
+        |> String.toInt
+        |> Result.withDefault 0
+        |> dividedBy (10 ^ String.length floatString)
+
+
+dividedBy : Int -> Int -> Float
+dividedBy divisor dividend =
+    toFloat dividend / toFloat divisor
 
 
 maybeExponentiate : Either Int Float -> Parser (Either Int Float)

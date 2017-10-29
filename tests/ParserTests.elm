@@ -2,8 +2,19 @@ module ParserTests exposing (..)
 
 import Expect exposing (Expectation)
 import Json exposing (Value)
+import Json.Encode
 import Json.Parser as Parser
+import JsonFuzzer exposing (json)
 import Test exposing (..)
+
+
+fuzzTest : Test
+fuzzTest =
+    fuzz (json 3) "Random JSON strings" <|
+        \( json, string ) ->
+            string
+                |> Parser.parse
+                |> expectOk json
 
 
 strings : Test
@@ -14,6 +25,7 @@ strings =
     , """ "\\\\b" """ => Json.String "\\b"
     , """ "This \\" is a \\n complicated \\t string" """ => Json.String "This \" is a \n complicated \t string"
     , """ "unicode\\u0020spaces" """ => Json.String "unicode spaces"
+    , """ "💩" """ => Json.String "💩"
     ]
         |> successTests "strings"
 
@@ -55,10 +67,13 @@ badInts =
 floats : Test
 floats =
     [ """ 0.5 """ => Json.Float 0.5
+    , """ 0.1 """ => Json.Float 0.1
+    , """ 0.0001 """ => Json.Float 0.0001
     , """ -0.0 """ => Json.Float 0
     , """ 0.6e5 """ => Json.Float 6.0e4
     , """ 0.0e0 """ => Json.Float 0
     , """ -9.5e6 """ => Json.Float -9.5e6
+    , """ 0.001e3 """ => Json.Float 1
     , """ 1e-1 """ => Json.Float 0.1
     ]
         |> successTests "floats"
@@ -165,7 +180,7 @@ successTest input output =
         \_ ->
             input
                 |> Parser.parse
-                |> Expect.equal (Ok output)
+                |> expectOk output
 
 
 failTests : String -> List String -> Test
@@ -188,3 +203,8 @@ infixr 0 =>
 (=>) : a -> b -> ( a, b )
 (=>) =
     (,)
+
+
+expectOk : Json.Value -> Result e Json.Value -> Expect.Expectation
+expectOk okVal =
+    Result.map (JsonFuzzer.equal okVal) >> Result.withDefault (Expect.fail "nope")

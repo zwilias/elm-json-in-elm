@@ -49,5 +49,5 @@ decoder =
         , CoreDecode.map Float CoreDecode.float
         , CoreDecode.null Null
         , CoreDecode.map Array (CoreDecode.list <| CoreDecode.lazy <| \_ -> decoder)
-        , CoreDecode.map Object (CoreDecode.keyValuePairs <| CoreDecode.lazy <| \_ -> decoder)
+        , CoreDecode.map (List.reverse >> Object) (CoreDecode.keyValuePairs <| CoreDecode.lazy <| \_ -> decoder)
         ]
