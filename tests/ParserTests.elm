@@ -2,7 +2,6 @@ module ParserTests exposing (..)
 
 import Expect exposing (Expectation)
 import Json exposing (Value)
-import Json.Encode
 import Json.Parser as Parser
 import JsonFuzzer exposing (json)
 import Test exposing (..)
@@ -50,6 +49,11 @@ ints =
     , """ -4e2 """ => Json.Int <| -4 * 10 ^ 2
     , """ 1E2 """ => Json.Int <| 1 * 10 ^ 2
     , """ 1e+2 """ => Json.Int <| 1 * 10 ^ 2
+    , """ -0.0 """ => Json.Int 0
+    , """ 0.6e5 """ => Json.Int <| 6 * 10 ^ 4
+    , """ 0.0e0 """ => Json.Int 0
+    , """ 0.001e3 """ => Json.Int 1
+    , """ -9.5e6 """ => Json.Int <| -9500000
     ]
         |> successTests "ints"
 
@@ -69,11 +73,6 @@ floats =
     [ """ 0.5 """ => Json.Float 0.5
     , """ 0.1 """ => Json.Float 0.1
     , """ 0.0001 """ => Json.Float 0.0001
-    , """ -0.0 """ => Json.Float 0
-    , """ 0.6e5 """ => Json.Float 6.0e4
-    , """ 0.0e0 """ => Json.Float 0
-    , """ -9.5e6 """ => Json.Float -9.5e6
-    , """ 0.001e3 """ => Json.Float 1
     , """ 1e-1 """ => Json.Float 0.1
     ]
         |> successTests "floats"
@@ -87,7 +86,7 @@ arrays =
     , """ [
 null
 \t,         "foo"] """ => Json.Array [ Json.Null, Json.String "foo" ]
-    , """ [ 5, 6.0, 1.0e9, -12 ] """ => Json.Array [ Json.Int 5, Json.Float 6, Json.Float 1.0e9, Json.Int -12 ]
+    , """ [ 5, 6.0, 1.0e9, -12 ] """ => Json.Array [ Json.Int 5, Json.Int 6, Json.Int 1000000000, Json.Int -12 ]
     , "[[]]" => Json.Array [ Json.Array [] ]
     ]
         |> successTests "arrays"
@@ -207,4 +206,14 @@ infixr 0 =>
 
 expectOk : Json.Value -> Result e Json.Value -> Expect.Expectation
 expectOk okVal =
-    Result.map (JsonFuzzer.equal okVal) >> Result.withDefault (Expect.fail "nope")
+    result (toString >> Expect.fail) (JsonFuzzer.equal okVal)
+
+
+result : (e -> b) -> (a -> b) -> Result e a -> b
+result onError onOk value =
+    case value of
+        Ok a ->
+            onOk a
+
+        Err e ->
+            onError e

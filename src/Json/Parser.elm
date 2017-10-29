@@ -196,9 +196,17 @@ jsonNumber =
        The sign has to be applied at the end, or we risk messing up float-stuff.
     -}
     inContext "a json number" <|
-        succeed applySignToIntOrFloat
+        succeed (\sign number -> applySign sign number |> toIntOrFloat)
             |= maybeNegative
-            |= (digits |> andThen exponentiateOrFloat)
+            |= parseNumber
+
+
+toIntOrFloat : Float -> Either Int Float
+toIntOrFloat float =
+    if (round >> toFloat) float == float then
+        Left <| round float
+    else
+        Right float
 
 
 digitString : Parser String
@@ -206,15 +214,9 @@ digitString =
     keep oneOrMore Char.isDigit
 
 
-digits : Parser Int
+digits : Parser Float
 digits =
-    digitString
-        |> andThen (String.toInt >> result fail succeed)
-
-
-applySignToIntOrFloat : Sign -> Either number1 number2 -> Either number1 number2
-applySignToIntOrFloat sign =
-    mapBoth (applySign sign)
+    digitString |> andThen (String.toInt >> result fail succeed >> map toFloat)
 
 
 maybeNegative : Parser Sign
@@ -225,30 +227,30 @@ maybeNegative =
         ]
 
 
-exponentiateOrFloat : Int -> Parser (Either Int Float)
-exponentiateOrFloat int =
-    oneOf
-        [ parseFloat int |> map Right |> andThen maybeExponentiate
-        , succeed int |> map Left |> andThen maybeExponentiate
-        ]
+parseNumber : Parser Float
+parseNumber =
+    digits |> andThen maybeFractional |> andThen maybeExponentiate
 
 
-parseFloat : Int -> Parser Float
-parseFloat intPart =
-    inContext "float" <|
-        succeed (makeFloat intPart)
-            |. symbol "."
-            |= digitString
+maybeFractional : Float -> Parser Float
+maybeFractional integerPart =
+    inContext "fractional" <|
+        oneOf
+            [ succeed (combine integerPart)
+                |. symbol "."
+                |= digitString
+            , succeed integerPart
+            ]
 
 
-makeFloat : Int -> String -> Float
-makeFloat integerPart fracPart =
-    toFloat integerPart + toFractional fracPart
+combine : Float -> String -> Float
+combine integerPart fracPart =
+    integerPart + toFractional fracPart
 
 
 toFractional : String -> Float
 toFractional floatString =
-    {- We parse "0.1" in 2 parts - an integer `0` and a _String_ `1`. The reason
+    {- We parse "0.1" in 2 parts - a Float `0` and a _String_ `1`. The reason
        for parsing the fractional as a String is because we need to handle cases
        like `1.01`. So, to turn the string `"01"` into `0.01`, we turn it into
        an integer and move if right by dividing by 10 a couple of times.
@@ -264,7 +266,7 @@ dividedBy divisor dividend =
     toFloat dividend / toFloat divisor
 
 
-maybeExponentiate : Either Int Float -> Parser (Either Int Float)
+maybeExponentiate : Float -> Parser Float
 maybeExponentiate number =
     {- At this point, we're dealing with either an Int or a Float, and may
        encounter an exponent (in the scientific notation sense).
@@ -277,13 +279,14 @@ maybeExponentiate number =
        we already make sure to parse `4e-1` as a Float (since having a `0.4` as
        an Int seems _really_ wrong).
     -}
-    oneOf
-        [ exponent |> map (applyExponent number)
-        , succeed number
-        ]
+    inContext "maybe exponentiate" <|
+        oneOf
+            [ exponent |> map (applyExponent number)
+            , succeed number
+            ]
 
 
-exponent : Parser Int
+exponent : Parser Float
 exponent =
     inContext "exponent" <|
         succeed applySign
@@ -292,44 +295,9 @@ exponent =
             |= digits
 
 
-applyExponent : Either Int Float -> Int -> Either Int Float
+applyExponent : Float -> Float -> Float
 applyExponent coeff exponent =
-    {- I'm not particularly proud of this bit.
-
-       The core issue is that exponentiation in Elm isn't very type-safe.
-
-           (^) : number -> number -> number
-
-       In other words, according to the type signature, `n ^ m`  is an integer
-       when both `n` and `m` are integers. However, negative exponents sort of
-       mess this up: `10 ^ -1 = 0.1`. However, if both parameters are integers,
-       Elm will actually say `0.1` is an integer.
-
-       Hence, when the coefficient is an integer and the exponent is negative,
-       we return a `Float` here.
-
-       So; new idea: consider everything a Float and "cast" it to an Int if
-       possible as late as possible.
-    -}
-    case coeff of
-        Left int ->
-            if exponent < 0 then
-                Right <| applyExponentToFloat (toFloat int) exponent
-            else
-                Left <| applyExponentToInt int exponent
-
-        Right float ->
-            Right <| applyExponentToFloat float exponent
-
-
-applyExponentToInt : Int -> Int -> Int
-applyExponentToInt coeff exponent =
     coeff * (10 ^ exponent)
-
-
-applyExponentToFloat : Float -> Int -> Float
-applyExponentToFloat coeff exponent =
-    coeff * (10 ^ toFloat exponent)
 
 
 type Sign
@@ -408,16 +376,6 @@ either left right leftOrRight =
 
         Right val ->
             right val
-
-
-mapBoth : (a -> b) -> Either a a -> Either b b
-mapBoth f leftOrRight =
-    case leftOrRight of
-        Left val ->
-            Left (f val)
-
-        Right val ->
-            Right (f val)
 
 
 result : (e -> b) -> (a -> b) -> Result e a -> b
