@@ -1,5 +1,9 @@
 module Json.Parser exposing (Error, parse)
 
+{-| TODO
+@docs parse, Error
+-}
+
 import Char
 import Json exposing (Value)
 import Parser
@@ -26,10 +30,14 @@ import Parser
 import Parser.LanguageKit exposing (Trailing(Forbidden), list, sequence)
 
 
+{-| TODO
+-}
 type alias Error =
     Parser.Error
 
 
+{-| TODO
+-}
 parse : String -> Result Error Value
 parse =
     Parser.run (json |. end)

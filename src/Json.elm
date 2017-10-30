@@ -1,9 +1,15 @@
 module Json exposing (Value(..), fromCore, toCore)
 
+{-| TODO
+@docs Value, toCore, fromCore
+-}
+
 import Json.Decode as CoreDecode
 import Json.Encode as Core
 
 
+{-| TODO
+-}
 type Value
     = String String
     | Int Int
@@ -13,6 +19,8 @@ type Value
     | Object (List ( String, Value ))
 
 
+{-| TODO
+-}
 toCore : Value -> Core.Value
 toCore value =
     case value of
@@ -35,6 +43,8 @@ toCore value =
             List.map (Tuple.mapSecond toCore) kvPairs |> Core.object
 
 
+{-| TODO
+-}
 fromCore : Core.Value -> Value
 fromCore value =
     CoreDecode.decodeValue decoder value

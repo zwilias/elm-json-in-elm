@@ -31,14 +31,26 @@ module Json.Decoder
         , value
         )
 
-import Json exposing (Value)
-import Json.Parser exposing (parse)
-
-
 {-|
 
     import Json
 
+@docs Decoder, Error
+@docs decodeString, decodeValue
+@docs string, int, float, null, value
+@docs index, list, field, at, keyValuePairs
+@docs fail, succeed, lazy
+@docs maybe, oneOf
+@docs map, andThen, andMap
+@docs map2, map3, map4, map5, map6, map7, map8
+
+-}
+
+import Json exposing (Value)
+import Json.Parser exposing (parse)
+
+
+{-| TODO
 -}
 type Error
     = Field String Error
@@ -48,6 +60,8 @@ type Error
     | BadJson Json.Parser.Error
 
 
+{-| TODO
+-}
 type Decoder a
     = Decoder (Value -> Result Error a)
 

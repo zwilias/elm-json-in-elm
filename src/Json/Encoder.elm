@@ -1,20 +1,34 @@
 module Json.Encoder exposing (encode, float, int, list, null, object, string)
 
+{-| TODO
+
+@docs encode
+
+@docs string, float, int, null, list, object
+
+-}
+
 import Dict
 import Json exposing (Value)
 import Set exposing (Set)
 
 
+{-| TODO
+-}
 string : String -> Value
 string =
     Json.String
 
 
+{-| TODO
+-}
 int : Int -> Value
 int =
     Json.Int
 
 
+{-| TODO
+-}
 float : Float -> Value
 float v =
     if (round >> toFloat) v == v then
@@ -23,11 +37,15 @@ float v =
         Json.Float v
 
 
+{-| TODO
+-}
 list : List Value -> Value
 list =
     Json.Array
 
 
+{-| TODO
+-}
 null : Value
 null =
     Json.Null
@@ -51,6 +69,8 @@ classifyKey key =
         |> Result.withDefault (Left key)
 
 
+{-| TODO
+-}
 object : List ( String, Value ) -> Value
 object =
     List.foldr
@@ -70,6 +90,8 @@ object =
         >> Json.Object
 
 
+{-| TODO
+-}
 encode : Value -> String
 encode value =
     case value of
