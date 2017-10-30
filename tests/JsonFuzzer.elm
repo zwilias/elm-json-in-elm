@@ -5,7 +5,7 @@ import Char
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer)
 import Json
-import Json.Encode as Encode exposing (encode)
+import Json.Encode as Core
 import Json.Encoder as Encoder
 
 
@@ -13,7 +13,7 @@ json : Int -> Int -> Fuzzer ( Json.Value, String )
 json maxDepth indent =
     rawJson maxDepth
         |> Fuzz.map
-            (\value -> ( value, value |> Json.toCore |> Encode.encode indent ))
+            (\value -> ( value, value |> Json.toCore |> Core.encode indent ))
 
 
 rawJson : Int -> Fuzzer Json.Value
