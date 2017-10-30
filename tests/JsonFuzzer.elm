@@ -1,4 +1,4 @@
-module JsonFuzzer exposing (equal, json, jsonString)
+module JsonFuzzer exposing (equal, json)
 
 import Bitwise
 import Char
@@ -9,16 +9,11 @@ import Json.Encode as Encode exposing (encode)
 import Json.Encoder as Encoder
 
 
-jsonString : Int -> Fuzzer String
-jsonString =
-    json >> Fuzz.map Tuple.second
-
-
-json : Int -> Fuzzer ( Json.Value, String )
-json =
-    rawJson
-        >> Fuzz.map
-            (\value -> ( value, value |> Json.toCore |> Encode.encode 0 ))
+json : Int -> Int -> Fuzzer ( Json.Value, String )
+json maxDepth indent =
+    rawJson maxDepth
+        |> Fuzz.map
+            (\value -> ( value, value |> Json.toCore |> Encode.encode indent ))
 
 
 rawJson : Int -> Fuzzer Json.Value

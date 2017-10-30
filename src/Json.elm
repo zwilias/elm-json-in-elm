@@ -1,14 +1,25 @@
 module Json exposing (Value(..), fromCore, toCore)
 
-{-| TODO
+{-| An exposed recursively defined union type that describes a JSON value, and
+functions to go back and forth between `elm-lang/core`'s `Value` representation.
+
+Note that manipulating this structure is much nicer when done through `Encoder`
+and `Decoder`.
+
 @docs Value, toCore, fromCore
+
 -}
 
 import Json.Decode as CoreDecode
 import Json.Encode as Core
 
 
-{-| TODO
+{-| A JSON value (actual JSON, not random JS) can be described using a structure
+like this one.
+
+Since the tags are also regular types, they are expected to be used qualified
+, so `Json.String` rather than `String`.
+
 -}
 type Value
     = String String
@@ -19,7 +30,9 @@ type Value
     | Object (List ( String, Value ))
 
 
-{-| TODO
+{-| Convert a `Json.Value` to `Json.Encode.Value` (which is an alias for
+`Json.Decode.Value`). Useful when integrating with `elm-lang/core`, though I
+don't expect this library to actually be used.
 -}
 toCore : Value -> Core.Value
 toCore value =
@@ -43,7 +56,11 @@ toCore value =
             List.map (Tuple.mapSecond toCore) kvPairs |> Core.object
 
 
-{-| TODO
+{-| Convert from a `Json.Encode.Value` _to_ a `Json.Value`.
+
+Note that if your input isn't a JSON serializable value, for example if it
+contains a function, this will simple return `Json.Null`.
+
 -}
 fromCore : Core.Value -> Value
 fromCore value =

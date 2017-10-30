@@ -9,7 +9,16 @@ import Test exposing (..)
 
 fuzzTest : Test
 fuzzTest =
-    fuzz (json 3) "Random JSON strings" <|
+    fuzz (json 3 0) "Random JSON strings" <|
+        \( json, string ) ->
+            string
+                |> Parser.parse
+                |> expectOk json
+
+
+fuzzWithIndentationTest : Test
+fuzzWithIndentationTest =
+    fuzz (json 3 2) "Random JSON strings with indentation" <|
         \( json, string ) ->
             string
                 |> Parser.parse

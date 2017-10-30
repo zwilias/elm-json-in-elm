@@ -92,31 +92,160 @@ object =
 
 {-| TODO
 -}
-encode : Value -> String
-encode value =
+encode : Int -> Value -> String
+encode indentDepth value =
+    let
+        separators : Separators
+        separators =
+            if indentDepth == 0 then
+                zeroIndent
+            else
+                indent indentDepth
+    in
+    tokenize value []
+        |> stringify separators 0 ""
+
+
+zeroIndent : Separators
+zeroIndent =
+    { increase = 0, line = "", pair = "" }
+
+
+indent : Int -> Separators
+indent increment =
+    { increase = increment, line = "\n", pair = " " }
+
+
+type alias Separators =
+    { increase : Int, line : String, pair : String }
+
+
+stringify : Separators -> Int -> String -> List Token -> String
+stringify separator currentDepth acc tokens =
+    let
+        indent : Int -> String
+        indent depth =
+            String.repeat depth " "
+    in
+    case tokens of
+        [] ->
+            acc
+
+        [ Token token content ] ->
+            case token of
+                Close ->
+                    acc ++ content
+
+                Literal ->
+                    acc ++ content
+
+                _ ->
+                    acc
+
+        (Token current val) :: (((Token next _) :: _) as rest) ->
+            let
+                nextDepth =
+                    nextIndent currentDepth separator.increase current next
+
+                suffix =
+                    case ( current, next ) of
+                        ( Literal, Close ) ->
+                            separator.line ++ indent nextDepth
+
+                        ( Literal, _ ) ->
+                            "," ++ separator.line ++ indent nextDepth
+
+                        ( PairKey, _ ) ->
+                            ":" ++ separator.pair
+
+                        ( Open, Close ) ->
+                            ""
+
+                        ( Open, _ ) ->
+                            separator.line ++ indent nextDepth
+
+                        ( _, Close ) ->
+                            separator.line ++ indent nextDepth
+
+                        ( Close, _ ) ->
+                            "," ++ separator.line ++ indent nextDepth
+            in
+            stringify separator nextDepth (acc ++ val ++ suffix) rest
+
+
+nextIndent : Int -> Int -> TokenType -> TokenType -> Int
+nextIndent depth increment current next =
+    case ( current, next ) of
+        ( Open, Close ) ->
+            depth
+
+        ( Open, _ ) ->
+            depth + increment
+
+        ( _, Close ) ->
+            depth - increment
+
+        _ ->
+            depth
+
+
+type Token
+    = Token TokenType String
+
+
+type TokenType
+    = Open
+    | Close
+    | PairKey
+    | Literal
+
+
+open : String -> Token
+open =
+    Token Open
+
+
+close : String -> Token
+close =
+    Token Close
+
+
+pairKey : String -> Token
+pairKey =
+    Token PairKey
+
+
+literal : String -> Token
+literal =
+    Token Literal
+
+
+tokenize : Value -> List Token -> List Token
+tokenize value tokens =
     case value of
         Json.String string ->
-            "\"" ++ escape string ++ "\""
+            (literal <| "\"" ++ escape string ++ "\"") :: tokens
 
         Json.Int int ->
-            toString int
+            (literal <| toString int) :: tokens
 
         Json.Float float ->
-            toString float
+            (literal <| toString float) :: tokens
 
         Json.Null ->
-            "null"
+            literal "null" :: tokens
 
         Json.Array valueList ->
-            "[" ++ (List.map encode valueList |> String.join ",") ++ "]"
+            open "[" :: List.foldr tokenize (close "]" :: tokens) valueList
 
         Json.Object valueStringList ->
-            "{" ++ (List.map encodePair valueStringList |> String.join ",") ++ "}"
-
-
-encodePair : ( String, Value ) -> String
-encodePair ( string, value ) =
-    "\"" ++ escape string ++ "\":" ++ encode value
+            open "{"
+                :: List.foldr
+                    (\( k, v ) acc ->
+                        pairKey ("\"" ++ escape k ++ "\"") :: tokenize v acc
+                    )
+                    (close "}" :: tokens)
+                    valueStringList
 
 
 escape : String -> String

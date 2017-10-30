@@ -8,17 +8,25 @@ import Test exposing (Test, fuzz, test)
 
 simpleFuzz : Test
 simpleFuzz =
-    fuzz (json 0) "simple fuzz test" <|
+    fuzz (json 0 0) "simple fuzz test" <|
         \( json, string ) ->
-            Encoder.encode json
+            Encoder.encode 0 json
                 |> Expect.equal string
 
 
 fullFuzz : Test
 fullFuzz =
-    fuzz (json 3) "full on fuzzer" <|
+    fuzz (json 3 0) "full on fuzzer" <|
         \( json, string ) ->
-            Encoder.encode json
+            Encoder.encode 0 json
+                |> Expect.equal string
+
+
+fuzzWithIndent : Test
+fuzzWithIndent =
+    fuzz (json 3 2) "full on fuzzing with indentation" <|
+        \( json, string ) ->
+            Encoder.encode 2 json
                 |> Expect.equal string
 
 
@@ -31,7 +39,7 @@ nonUniqueKeyPrecedenceForStringKeys =
                 , "b" => Encoder.null
                 , "a" => Encoder.string "b"
                 ]
-                |> Encoder.encode
+                |> Encoder.encode 0
                 |> Expect.equal """{"b":null,"a":"b"}"""
 
 
@@ -47,7 +55,7 @@ intKeysBeforeStringKeys =
                 , "0" => Encoder.string "first"
                 , "99999" => Encoder.string "second"
                 ]
-                |> Encoder.encode
+                |> Encoder.encode 0
                 |> Expect.equal """{"0":"first","99999":"second","-1":"third","a":"fourth"}"""
 
 

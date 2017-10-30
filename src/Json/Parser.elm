@@ -1,7 +1,11 @@
 module Json.Parser exposing (Error, parse)
 
-{-| TODO
+{-| Given a JSON string, parse it into a `Json.Value` type.
+
+If that fails, give a nice representation of where the error may be.
+
 @docs parse, Error
+
 -}
 
 import Char
@@ -30,7 +34,10 @@ import Parser
 import Parser.LanguageKit exposing (Trailing(Forbidden), list, sequence)
 
 
-{-| TODO
+{-| A parser [`Error`]() describes what went wrong and how to locate the failure.
+
+[`Error`]: http://package.elm-lang.org/packages/elm-tools/parser/2.0.1/Parser#Errors
+
 -}
 type alias Error =
     Parser.Error
