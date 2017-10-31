@@ -1,11 +1,7 @@
 module Json.Parser exposing (Error, parse)
 
-{-| Given a JSON string, parse it into a `Json.Value` type.
-
-If that fails, give a nice representation of where the error may be.
-
+{-| Parse a String representing sme JSON into a `Json.Value` value.
 @docs parse, Error
-
 -}
 
 import Char
@@ -43,7 +39,10 @@ type alias Error =
     Parser.Error
 
 
-{-| TODO
+{-| Given a JSON string, parse it into a `Json.Value` type.
+
+If that fails, give a nice representation of where the error may be.
+
 -}
 parse : String -> Result Error Value
 parse =

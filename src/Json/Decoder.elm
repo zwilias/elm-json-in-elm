@@ -50,7 +50,28 @@ import Json exposing (Value)
 import Json.Parser exposing (parse)
 
 
-{-| TODO
+{-| Sometimes decoding fails, due to any number of reasons. Actually, it's
+usually a fairly limited set of reason.
+
+The most generic reason is a type mismatch. This is represented as a `Failure`
+which carries information about the type that was expected, and what was
+actually encountered.
+
+If that failure happes to happen while decoding the field of an object, the
+failure will be wrapped in a `Field` error, with a string identifying the field.
+
+A similar thing counts for `Index` which represents a decode failure somewhere
+nested in a structure.
+
+If you tried a bunch of decoders using `oneOf` and they _all_ failed, the errors
+will be wrapped in a `OneOf` error.
+
+These errors stack, so you can reconstruct the path to the failure by peeling
+off layers of the Error-stack.
+
+Occasionally, you're just dealing with some JSON that could be parsed at all. In
+that case, you'll see a `BadJson` error containing the parse-error.
+
 -}
 type Error
     = Field String Error
@@ -60,7 +81,9 @@ type Error
     | BadJson Json.Parser.Error
 
 
-{-| TODO
+{-| A Decoder is a sort of recipe for how to go from "arbitrary JSON" to "your
+nicely typed Elm structure". They are built up using the primitives and
+combinators defined in this library.
 -}
 type Decoder a
     = Decoder (Value -> Result Error a)
@@ -469,6 +492,10 @@ from all of them. Else, you'll receive the value of the first successful decoder
 oneOf : List (Decoder a) -> Decoder a
 oneOf decoders =
     let
+        initialResult : ( List Error, Maybe a )
+        initialResult =
+            ( [], Nothing )
+
         combineResults : Value -> Decoder a -> ( List Error, Maybe a ) -> ( List Error, Maybe a )
         combineResults json (Decoder decoderF) ( errors, result ) =
             case result of
@@ -490,9 +517,7 @@ oneOf decoders =
     in
     Decoder <|
         \json ->
-            List.foldl (combineResults json)
-                ( [], Nothing )
-                decoders
+            List.foldl (combineResults json) initialResult decoders
                 |> wrapUp
 
 
