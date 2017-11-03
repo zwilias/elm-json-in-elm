@@ -16,15 +16,15 @@ import Set exposing (Set)
 {-| TODO
 -}
 string : String -> Value
-string =
-    Json.String
+string val =
+    Json.String val Nothing
 
 
 {-| TODO
 -}
 int : Int -> Value
-int =
-    Json.Int
+int val =
+    Json.Int val Nothing
 
 
 {-| TODO
@@ -32,23 +32,23 @@ int =
 float : Float -> Value
 float v =
     if (round >> toFloat) v == v then
-        Json.Int (round v)
+        Json.Int (round v) Nothing
     else
-        Json.Float v
+        Json.Float v Nothing
 
 
 {-| TODO
 -}
 list : List Value -> Value
-list =
-    Json.Array
+list vals =
+    Json.Array vals Nothing
 
 
 {-| TODO
 -}
 null : Value
 null =
-    Json.Null
+    Json.Null Nothing
 
 
 type Either a b
@@ -87,7 +87,7 @@ object =
         )
         ( Set.empty, [], Dict.empty )
         >> (\( _, vals, intKeyDict ) -> Dict.toList intKeyDict ++ vals)
-        >> Json.Object
+        >> flip Json.Object Nothing
 
 
 {-| TODO
@@ -223,22 +223,22 @@ literal =
 tokenize : Value -> List Token -> List Token
 tokenize value tokens =
     case value of
-        Json.String string ->
+        Json.String string _ ->
             (literal <| "\"" ++ escape string ++ "\"") :: tokens
 
-        Json.Int int ->
+        Json.Int int _ ->
             (literal <| toString int) :: tokens
 
-        Json.Float float ->
+        Json.Float float _ ->
             (literal <| toString float) :: tokens
 
-        Json.Null ->
+        Json.Null _ ->
             literal "null" :: tokens
 
-        Json.Array valueList ->
+        Json.Array valueList _ ->
             open "[" :: List.foldr tokenize (close "]" :: tokens) valueList
 
-        Json.Object valueStringList ->
+        Json.Object valueStringList _ ->
             open "{"
                 :: List.foldr
                     (\( k, v ) acc ->

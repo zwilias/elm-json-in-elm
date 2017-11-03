@@ -4,19 +4,19 @@ import Bitwise
 import Char
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer)
-import Json
+import Json exposing (Value)
 import Json.Encode as Core
 import Json.Encoder as Encoder
 
 
-json : Int -> Int -> Fuzzer ( Json.Value, String )
+json : Int -> Int -> Fuzzer ( Value, String )
 json maxDepth indent =
     rawJson maxDepth
         |> Fuzz.map
             (\value -> ( value, value |> Json.toCore |> Core.encode indent ))
 
 
-rawJson : Int -> Fuzzer Json.Value
+rawJson : Int -> Fuzzer Value
 rawJson maxDepth =
     if maxDepth == 0 then
         Fuzz.oneOf <| List.map Tuple.second leaves
@@ -24,7 +24,7 @@ rawJson maxDepth =
         Fuzz.frequency <| leaves ++ (branches <| maxDepth - 1)
 
 
-leaves : List ( Float, Fuzzer Json.Value )
+leaves : List ( Float, Fuzzer Value )
 leaves =
     [ 1 => Fuzz.constant Encoder.null
     , 3 => Fuzz.map Encoder.string hardcoreString
@@ -33,14 +33,14 @@ leaves =
     ]
 
 
-branches : Int -> List ( Float, Fuzzer Json.Value )
+branches : Int -> List ( Float, Fuzzer Value )
 branches maxDepth =
     [ 1 => Fuzz.map Encoder.list (Fuzz.list (rawJson maxDepth))
     , 1 => Fuzz.map Encoder.object (Fuzz.list (objectEntry maxDepth))
     ]
 
 
-objectEntry : Int -> Fuzzer ( String, Json.Value )
+objectEntry : Int -> Fuzzer ( String, Value )
 objectEntry maxDepth =
     Fuzz.map2 (,)
         hardcoreString
@@ -103,18 +103,27 @@ ranges =
 -- JSON equality
 
 
-equal : Json.Value -> Json.Value -> Expectation
+equal : Value -> Value -> Expectation
 equal expected actual =
     case ( expected, actual ) of
-        ( Json.Float left, Json.Float right ) ->
+        ( Json.Int left _, Json.Int right _ ) ->
+            left |> Expect.equal right
+
+        ( Json.Float left _, Json.Float right _ ) ->
             Expect.within (Expect.Absolute 0.0000000001) left right
 
-        ( Json.Array left, Json.Array right ) ->
+        ( Json.Array left _, Json.Array right _ ) ->
             List.map2 equal left right
                 |> (::) (Expect.equal (List.length left) (List.length right))
                 |> expectAll
 
-        ( Json.Object left, Json.Object right ) ->
+        ( Json.String left _, Json.String right _ ) ->
+            left |> Expect.equal right
+
+        ( Json.Null _, Json.Null _ ) ->
+            Expect.pass
+
+        ( Json.Object left _, Json.Object right _ ) ->
             let
                 ( leftKeys, leftValues ) =
                     List.unzip left
@@ -135,7 +144,7 @@ equal expected actual =
             expectAll [ keysExpectation, valuesExpectation ]
 
         _ ->
-            Expect.equal expected actual
+            Expect.fail "I need a better error here 😞"
 
 
 expectAll : List Expectation -> Expectation

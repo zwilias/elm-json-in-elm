@@ -1,4 +1,4 @@
-module Json exposing (Value(..), fromCore, toCore)
+module Json exposing (Bounds, Location, Value(..), equals, toCore)
 
 {-| An exposed recursively defined union type that describes a JSON value, and
 functions to go back and forth between `elm-lang/core`'s `Value` representation.
@@ -6,11 +6,10 @@ functions to go back and forth between `elm-lang/core`'s `Value` representation.
 Note that manipulating this structure is much nicer when done through `Encoder`
 and `Decoder`.
 
-@docs Value, toCore, fromCore
+@docs Value, Location, Bounds, toCore, equals
 
 -}
 
-import Json.Decode as CoreDecode
 import Json.Encode as Core
 
 
@@ -22,12 +21,24 @@ Since the tags are also regular types, they are expected to be used qualified
 
 -}
 type Value
-    = String String
-    | Int Int
-    | Float Float
-    | Null
-    | Array (List Value)
-    | Object (List ( String, Value ))
+    = String String (Maybe Bounds)
+    | Int Int (Maybe Bounds)
+    | Float Float (Maybe Bounds)
+    | Null (Maybe Bounds)
+    | Array (List Value) (Maybe Bounds)
+    | Object (List ( String, Value )) (Maybe Bounds)
+
+
+{-| TOD
+-}
+type alias Bounds =
+    { start : Location, end : Location }
+
+
+{-| TODO
+-}
+type alias Location =
+    ( Int, Int )
 
 
 {-| Convert a `Json.Value` to `Json.Encode.Value` (which is an alias for
@@ -37,44 +48,74 @@ don't expect this library to actually be used.
 toCore : Value -> Core.Value
 toCore value =
     case value of
-        String val ->
+        String val _ ->
             Core.string val
 
-        Int val ->
+        Int val _ ->
             Core.int val
 
-        Float val ->
+        Float val _ ->
             Core.float val
 
-        Null ->
+        Null _ ->
             Core.null
 
-        Array values ->
+        Array values _ ->
             List.map toCore values |> Core.list
 
-        Object kvPairs ->
-            List.map (Tuple.mapSecond toCore) kvPairs |> Core.object
+        Object kvPairs _ ->
+            List.map (Tuple.mapSecond toCore) kvPairs
+                |> Core.object
 
 
-{-| Convert from a `Json.Encode.Value` _to_ a `Json.Value`.
+equalLists : (a -> a -> Bool) -> List a -> List a -> Bool
+equalLists check lefts rights =
+    case ( lefts, rights ) of
+        ( [], [] ) ->
+            True
 
-Note that if your input isn't a JSON serializable value, for example if it
-contains a function, this will simple return `Json.Null`.
+        ( x :: xs, y :: ys ) ->
+            if check x y then
+                equalLists check xs ys
+            else
+                False
 
+        _ ->
+            False
+
+
+{-| TODO
 -}
-fromCore : Core.Value -> Value
-fromCore value =
-    CoreDecode.decodeValue decoder value
-        |> Result.withDefault Null
+equals : Value -> Value -> Bool
+equals leftVal rightVal =
+    let
+        maxFloatDeviation : Float
+        maxFloatDeviation =
+            0.00000001
+    in
+    case ( leftVal, rightVal ) of
+        ( Null _, Null _ ) ->
+            True
 
+        ( String left _, String right _ ) ->
+            left == right
 
-decoder : CoreDecode.Decoder Value
-decoder =
-    CoreDecode.oneOf
-        [ CoreDecode.map String CoreDecode.string
-        , CoreDecode.map Int CoreDecode.int
-        , CoreDecode.map Float CoreDecode.float
-        , CoreDecode.null Null
-        , CoreDecode.map Array (CoreDecode.list <| CoreDecode.lazy <| \_ -> decoder)
-        , CoreDecode.map (List.reverse >> Object) (CoreDecode.keyValuePairs <| CoreDecode.lazy <| \_ -> decoder)
-        ]
+        ( Int left _, Int right _ ) ->
+            left == right
+
+        ( Float left _, Float right _ ) ->
+            (left - maxFloatDeviation) <= right && (left + maxFloatDeviation) >= right
+
+        ( Array leftVals _, Array rightVals _ ) ->
+            equalLists equals leftVals rightVals
+
+        ( Object lefts _, Object rights _ ) ->
+            equalLists
+                (\( lKey, lVal ) ( rKey, rVal ) ->
+                    lKey == rKey && equals lVal rVal
+                )
+                (List.sortBy Tuple.first lefts)
+                (List.sortBy Tuple.first rights)
+
+        _ ->
+            False

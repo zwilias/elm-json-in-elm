@@ -2,6 +2,7 @@ module Json.Decoder
     exposing
         ( Decoder
         , Error(..)
+        , JsonError(..)
         , andMap
         , andThen
         , at
@@ -34,8 +35,9 @@ module Json.Decoder
 {-|
 
     import Json
+    import Json.Encoder as Encode
 
-@docs Decoder, Error
+@docs Decoder, Error, JsonError
 @docs decodeString, decodeValue
 @docs string, int, float, null, value
 @docs index, list, field, at, keyValuePairs
@@ -78,7 +80,17 @@ type Error
     | Index Int Error
     | OneOf (List Error)
     | Failure String Value
-    | BadJson Json.Parser.Error
+
+
+type alias Location =
+    ( Int, Int )
+
+
+{-| TODO
+-}
+type JsonError
+    = ParseError Json.Parser.Error
+    | DecodingError Error
 
 
 {-| A Decoder is a sort of recipe for how to go from "arbitrary JSON" to "your
@@ -95,19 +107,19 @@ type Decoder a
 
 {-| Given a `String` representing JSON, run the provided decoder on that input.
 -}
-decodeString : Decoder a -> String -> Result Error a
+decodeString : Decoder a -> String -> Result JsonError a
 decodeString decoder string =
     parse string
-        |> Result.mapError BadJson
-        |> Result.andThen (decodeValue decoder)
+        |> Result.mapError ParseError
+        |> Result.andThen (decodeValue decoder >> Result.mapError DecodingError)
 
 
 {-| Given a `Json.Value`, run the provided the decoder. This can never result in
 a `BadJson` error.
 
-    Json.String "foo"
-        |> decodeValue string
-        |> Ok "foo"
+    """ "foo" """
+        |> decodeString string
+    --> Ok "foo"
 
 -}
 decodeValue : Decoder a -> (Value -> Result Error a)
@@ -142,16 +154,21 @@ succeed a =
 {-| Create a decoder that will always fail with the same message for every
 structurally valid JSON.
 
+    actualValue : Json.Value
+    actualValue =
+        Json.String "hello world" <| Just { start = (1,2), end = (1,15) }
+
+
     """ "hello world" """
         |> decodeString (fail "oops")
-    --> Err (Failure "oops" (Json.String "hello world"))
+    --> Err (DecodingError <| Failure "oops" actualValue)
 
 For input that fails with a parse error, you will still receive the parse error.
 
-    parseErrorToString : Error -> String
+    parseErrorToString : JsonError -> String
     parseErrorToString error =
         case error of
-            BadJson _ ->
+            ParseError _ ->
                 "parse error"
             _ ->
                 toString error
@@ -172,12 +189,14 @@ fail msg =
 
     """ null """
         |> decodeString value
-    --> Ok Json.Null
+        |> Result.map (Json.equals Encode.null)
+    --> Ok True
 
 
     """ { "key": "value" } """
         |> decodeString (field "key" value)
-    --> Ok (Json.String "value")
+        |> Result.map (Json.equals <| Encode.string "value")
+    --> Ok True
 
 -}
 value : Decoder Value
@@ -198,8 +217,12 @@ value =
 
     """ 12 """
         |> decodeString string
-    --> Err (Failure "Expected a string" (Json.Int 12))
+    --> Err (DecodingError <| Failure "Expected a string" actualValue)
 
+
+    actualValue : Json.Value
+    actualValue =
+        Json.Int 12 (Just { start = (1,2), end = (1,4) })
 
     """ "foo\\nbar\\nbar" """
         |> decodeString string
@@ -216,7 +239,7 @@ string =
     Decoder <|
         \json ->
             case json of
-                Json.String val ->
+                Json.String val _ ->
                     Ok val
 
                 _ ->
@@ -247,7 +270,7 @@ int =
     Decoder <|
         \json ->
             case json of
-                Json.Int val ->
+                Json.Int val _ ->
                     Ok val
 
                 _ ->
@@ -281,10 +304,10 @@ float =
     Decoder <|
         \json ->
             case json of
-                Json.Float val ->
+                Json.Float val _ ->
                     Ok val
 
-                Json.Int val ->
+                Json.Int val _ ->
                     Ok (toFloat val)
 
                 _ ->
@@ -303,7 +326,7 @@ null onNull =
     Decoder <|
         \json ->
             case json of
-                Json.Null ->
+                Json.Null _ ->
                     Ok onNull
 
                 _ ->
@@ -323,7 +346,12 @@ null onNull =
 
     """ "oops" """
         |> decodeString (field "foo" string)
-    --> Err (Failure "Expected an object with a field 'foo'" (Json.String "oops"))
+    --> Err (DecodingError <| Failure "Expected an object with a field 'foo'" actualValue)
+
+
+    actualValue : Json.Value
+    actualValue =
+        Json.String "oops" (Just { start = (1,2), end = (1,8) })
 
 -}
 field : String -> Decoder a -> Decoder a
@@ -331,7 +359,7 @@ field name (Decoder decoderF) =
     Decoder <|
         \json ->
             case json of
-                Json.Object keyValuePairs ->
+                Json.Object keyValuePairs location ->
                     let
                         entry : Maybe Value
                         entry =
@@ -378,7 +406,12 @@ at path decoder =
 
     """ { "name": "Alex", "age": 34 } """
         |> decodeString (keyValuePairs string)
-    --> Err (Field "age" (Failure "Expected a string" (Json.Int 34)))
+    --> Err (DecodingError <| Field "age" (Failure "Expected a string" actualValue))
+
+
+    actualValue : Json.Value
+    actualValue =
+        Json.Int 34 (Just { start = (1,27), end = (1,29) })
 
 -}
 keyValuePairs : Decoder a -> Decoder (List ( String, a ))
@@ -386,7 +419,7 @@ keyValuePairs (Decoder decoderF) =
     Decoder <|
         \json ->
             case json of
-                Json.Object rawKeyValuePairs ->
+                Json.Object rawKeyValuePairs _ ->
                     List.foldl
                         (\( key, value ) accResult ->
                             Result.map2 ((,) key >> (::))
@@ -410,7 +443,12 @@ keyValuePairs (Decoder decoderF) =
 
     """ [ null, 12 ] """
         |> decodeString (list int)
-    --> Err (Index 0 (Failure "Expected an integer" Json.Null))
+    --> Err (DecodingError <| Index 0 (Failure "Expected an integer" actualValue))
+
+
+    actualValue : Json.Value
+    actualValue =
+        Json.Null (Just { start = (1,4), end = (1,8) })
 
 -}
 list : Decoder a -> Decoder (List a)
@@ -418,7 +456,7 @@ list (Decoder decoderF) =
     Decoder <|
         \json ->
             case json of
-                Json.Array rawValues ->
+                Json.Array rawValues _ ->
                     List.foldl
                         (\value ( accResult, idx ) ->
                             ( Result.map2 (::)
@@ -443,9 +481,14 @@ list (Decoder decoderF) =
     --> Ok 12
 
 
+    actualValue : Json.Value
+    actualValue =
+        Json.Array [] (Just { start = (1,2), end = (1,4) })
+
+
     """ [] """
         |> decodeString (index 0 int)
-    --> Err (Failure "Expected an array with index 0" (Json.Array []))
+    --> Err (DecodingError <| Failure "Expected an array with index 0" actualValue)
 
 -}
 index : Int -> Decoder a -> Decoder a
@@ -453,7 +496,7 @@ index idx (Decoder decoderF) =
     Decoder <|
         \json ->
             case json of
-                Json.Array rawValues ->
+                Json.Array rawValues _ ->
                     List.foldl
                         (\value ( accResult, currentIdx ) ->
                             if idx == currentIdx then
@@ -536,11 +579,18 @@ and returning succeeding with `Nothing`.
     --> Ok Nothing
 
 
+    actualValue : Json.Value
+    actualValue =
+        Json.Object
+            [ ( "foo", Json.String "bar" (Just { start = (1,11), end = (1,16) }) ) ]
+            (Just { start = (1,2), end = (1,18) })
+
+
     """ { "foo": "bar" } """
         -- Putting the `maybe` inside results in failure, since the field isn't
         -- there to begin with.
         |> decodeString (field "bar" (maybe string))
-    --> Err (Failure "Expected an object with a field 'bar'" (Json.Object [ ("foo", Json.String "bar" ) ]))
+    --> Err (DecodingError <| Failure "Expected an object with a field 'bar'" actualValue)
 
 
     """ { "foo": "bar" } """

@@ -5,7 +5,7 @@ module Json.Parser exposing (Error, parse)
 -}
 
 import Char
-import Json exposing (Value)
+import Json exposing (Bounds, Location, Value)
 import Parser
     exposing
         ( (|.)
@@ -28,6 +28,7 @@ import Parser
         , zeroOrMore
         )
 import Parser.LanguageKit exposing (Trailing(Forbidden), list, sequence)
+import Parser.LowLevel exposing (getPosition)
 
 
 {-| A parser [`Error`]() describes what went wrong and how to locate the failure.
@@ -56,8 +57,14 @@ spaces =
 
 json : Parser Value
 json =
-    succeed identity
+    let
+        applyBounds : Location -> (Maybe Bounds -> a) -> Location -> a
+        applyBounds start needsBounds end =
+            needsBounds <| Just { start = start, end = end }
+    in
+    succeed applyBounds
         |. spaces
+        |= getPosition
         |= oneOf
             [ map Json.String jsonString
             , map (either Json.Int Json.Float) jsonNumber
@@ -65,6 +72,7 @@ json =
             , map Json.Array (lazy <| \_ -> jsonArray)
             , map Json.Object (lazy <| \_ -> jsonObject)
             ]
+        |= getPosition
         |. spaces
 
 

@@ -1,7 +1,7 @@
 module ParserTests exposing (..)
 
 import Expect exposing (Expectation)
-import Json exposing (Value)
+import Json
 import Json.Parser as Parser
 import JsonFuzzer exposing (json)
 import Test exposing (..)
@@ -27,13 +27,13 @@ fuzzWithIndentationTest =
 
 strings : Test
 strings =
-    [ """ "" """ => Json.String ""
-    , """ "foo" """ => Json.String "foo"
-    , """ "a\\"" """ => Json.String "a\""
-    , """ "\\\\b" """ => Json.String "\\b"
-    , """ "This \\" is a \\n complicated \\t string" """ => Json.String "This \" is a \n complicated \t string"
-    , """ "unicode\\u0020spaces" """ => Json.String "unicode spaces"
-    , """ "💩" """ => Json.String "💩"
+    [ """ "" """ => Json.String "" Nothing
+    , """ "foo" """ => Json.String "foo" Nothing
+    , """ "a\\"" """ => Json.String "a\"" Nothing
+    , """ "\\\\b" """ => Json.String "\\b" Nothing
+    , """ "This \\" is a \\n complicated \\t string" """ => Json.String "This \" is a \n complicated \t string" Nothing
+    , """ "unicode\\u0020spaces" """ => Json.String "unicode spaces" Nothing
+    , """ "💩" """ => Json.String "💩" Nothing
     ]
         |> successTests "strings"
 
@@ -50,19 +50,19 @@ failStrings =
 
 ints : Test
 ints =
-    [ """ 5 """ => Json.Int 5
-    , """ -0 """ => Json.Int 0
-    , """ 0 """ => Json.Int 0
-    , """ -9099 """ => Json.Int -9099
-    , """ 1e9 """ => Json.Int <| 1 * 10 ^ 9
-    , """ -4e2 """ => Json.Int <| -4 * 10 ^ 2
-    , """ 1E2 """ => Json.Int <| 1 * 10 ^ 2
-    , """ 1e+2 """ => Json.Int <| 1 * 10 ^ 2
-    , """ -0.0 """ => Json.Int 0
-    , """ 0.6e5 """ => Json.Int <| 6 * 10 ^ 4
-    , """ 0.0e0 """ => Json.Int 0
-    , """ 0.001e3 """ => Json.Int 1
-    , """ -9.5e6 """ => Json.Int <| -9500000
+    [ """ 5 """ => Json.Int 5 Nothing
+    , """ -0 """ => Json.Int 0 Nothing
+    , """ 0 """ => Json.Int 0 Nothing
+    , """ -9099 """ => Json.Int -9099 Nothing
+    , """ 1e9 """ => Json.Int (1 * 10 ^ 9) Nothing
+    , """ -4e2 """ => Json.Int (-4 * 10 ^ 2) Nothing
+    , """ 1E2 """ => Json.Int (1 * 10 ^ 2) Nothing
+    , """ 1e+2 """ => Json.Int (1 * 10 ^ 2) Nothing
+    , """ -0.0 """ => Json.Int 0 Nothing
+    , """ 0.6e5 """ => Json.Int (6 * 10 ^ 4) Nothing
+    , """ 0.0e0 """ => Json.Int 0 Nothing
+    , """ 0.001e3 """ => Json.Int 1 Nothing
+    , """ -9.5e6 """ => Json.Int -9500000 Nothing
     ]
         |> successTests "ints"
 
@@ -79,24 +79,36 @@ badInts =
 
 floats : Test
 floats =
-    [ """ 0.5 """ => Json.Float 0.5
-    , """ 0.1 """ => Json.Float 0.1
-    , """ 0.0001 """ => Json.Float 0.0001
-    , """ 1e-1 """ => Json.Float 0.1
+    [ """ 0.5 """ => Json.Float 0.5 Nothing
+    , """ 0.1 """ => Json.Float 0.1 Nothing
+    , """ 0.0001 """ => Json.Float 0.0001 Nothing
+    , """ 1e-1 """ => Json.Float 0.1 Nothing
     ]
         |> successTests "floats"
 
 
 arrays : Test
 arrays =
-    [ """ [] """ => Json.Array []
-    , """ [ "foo" ] """ => Json.Array [ Json.String "foo" ]
-    , """ [null] """ => Json.Array [ Json.Null ]
+    [ """ [] """ => Json.Array [] Nothing
+    , """ [ "foo" ] """ => Json.Array [ Json.String "foo" Nothing ] Nothing
+    , """ [null] """ => Json.Array [ Json.Null Nothing ] Nothing
     , """ [
 null
-\t,         "foo"] """ => Json.Array [ Json.Null, Json.String "foo" ]
-    , """ [ 5, 6.0, 1.0e9, -12 ] """ => Json.Array [ Json.Int 5, Json.Int 6, Json.Int 1000000000, Json.Int -12 ]
-    , "[[]]" => Json.Array [ Json.Array [] ]
+\t,         "foo"] """
+        => Json.Array
+            [ Json.Null Nothing
+            , Json.String "foo" Nothing
+            ]
+            Nothing
+    , """ [ 5, 6.0, 1.0e9, -12 ] """
+        => Json.Array
+            [ Json.Int 5 Nothing
+            , Json.Int 6 Nothing
+            , Json.Int 1000000000 Nothing
+            , Json.Int -12 Nothing
+            ]
+            Nothing
+    , "[[]]" => Json.Array [ Json.Array [] Nothing ] Nothing
     ]
         |> successTests "arrays"
 
@@ -114,8 +126,8 @@ badArrays =
 
 objects : Test
 objects =
-    [ """ {} """ => Json.Object []
-    , """ { "hello": "world" } """ => Json.Object [ "hello" => Json.String "world" ]
+    [ """ {} """ => Json.Object [] Nothing
+    , """ { "hello": "world" } """ => Json.Object [ "hello" => Json.String "world" Nothing ] Nothing
     ]
         |> successTests "objects"
 
@@ -128,7 +140,7 @@ badObjects =
 
 null : Test
 null =
-    successTest "null" Json.Null
+    successTest "null" (Json.Null Nothing)
 
 
 arbitrary : Test
@@ -151,38 +163,46 @@ arbitrary =
 ]
 """
 
-        expected : Value
+        expected : Json.Value
         expected =
             Json.Array
-                [ Json.Null
-                , Json.String "foo"
-                , Json.Float 1.23
-                , Json.Int 99
+                [ Json.Null Nothing
+                , Json.String "foo" Nothing
+                , Json.Float 1.23 Nothing
+                , Json.Int 99 Nothing
                 , Json.Object
-                    [ "type" => Json.String "foo"
-                    , "bar" => Json.String "baz"
-                    , "age" => Json.Int 27
-                    , "stuff" => Json.Array [ Json.Int 1, Json.Int 2, Json.Int 3 ]
+                    [ "type" => Json.String "foo" Nothing
+                    , "bar" => Json.String "baz" Nothing
+                    , "age" => Json.Int 27 Nothing
+                    , "stuff"
+                        => Json.Array
+                            [ Json.Int 1 Nothing
+                            , Json.Int 2 Nothing
+                            , Json.Int 3 Nothing
+                            ]
+                            Nothing
                     ]
+                    Nothing
                 ]
+                Nothing
     in
     test "arbitrary" <|
         \_ ->
             input
                 |> Parser.parse
-                |> Expect.equal (Ok expected)
+                |> expectOk expected
 
 
 
 -- helpers
 
 
-successTests : String -> List ( String, Value ) -> Test
+successTests : String -> List ( String, Json.Value ) -> Test
 successTests description cases =
     List.map (uncurry successTest) cases |> describe description
 
 
-successTest : String -> Value -> Test
+successTest : String -> Json.Value -> Test
 successTest input output =
     test input <|
         \_ ->
